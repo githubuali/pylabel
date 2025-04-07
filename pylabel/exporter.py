@@ -752,6 +752,8 @@ class Export:
                 then increment the cat_ids to index + number of categories continuously.
                 It's useful if the cat_ids are not continuous in the original dataset.
                 Some models like Yolo require starting from 0 and others like Detectron require starting from 1.
+            background (list): 
+                List of categories used as background for no detections
 
         Returns:
             A list with 1 or more paths (strings) to annotations files.
@@ -784,8 +786,8 @@ class Export:
         pbar = tqdm(desc="Exporting to COCO file...", total=df.shape[0])
 
         if background: 
-            df_back = df[df["cat_name"] == background]
-            df = df[df["cat_name"] != background]
+            df_back = df[df["cat_name"].isin(background)]
+            df = df[~df["cat_name"].isin(background)]
             list_img_filename_shared = df.merge(df_back, how="inner", on=["img_filename"])["img_filename"].unique()
             df_back = df_back[~df_back["img_filename"].isin(list_img_filename_shared)]
 
