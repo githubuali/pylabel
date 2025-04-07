@@ -739,7 +739,7 @@ class Export:
 
         return output_file_paths
 
-    def ExportToCoco(self, output_path=None, cat_id_index=None):
+    def ExportToCoco(self, output_path=None, cat_id_index=None, background = None):
         """
         Writes COCO annotation files to disk (in JSON format) and returns the path to files.
 
@@ -774,6 +774,7 @@ class Export:
             _ReindexCatIds(df, cat_id_index)
 
         df_outputI = []
+        df_back_outputI = []
         df_outputA = []
         df_outputC = []
         list_i = []
@@ -781,6 +782,20 @@ class Export:
         json_list = []
 
         pbar = tqdm(desc="Exporting to COCO file...", total=df.shape[0])
+
+        if background: 
+            df_back = df[df["cat_name"] == background]
+            df = df[df["cat_name"] != background]
+            list_img_filename_shared = df.merge(df_back, how="inner", on=["img_filename"])["img_filename"].unique()
+            df_back = df_back[~df_back["img_filename"].isin(list_img_filename_shared)]
+
+
+            df = self._update_ids(df)
+
+            start_image_id = max(df["img_id"]) + 1
+            df_back = self._update_ids(df_back, start_image_id)
+        
+
         for i in range(0, df.shape[0]):
             images = [
                 {
@@ -870,7 +885,31 @@ class Export:
 
             pbar.update()
 
+        if background: 
+            for i in range(0, df_back.shape[0]): 
+                images_back = [
+                    {
+                        "id": df_back["img_id"][i],
+                        "folder": df_back["img_folder"][i],
+                        "file_name": df_back["img_filename"][i],
+                        "path": df_back["img_path"][i],
+                        "width": df_back["img_width"][i],
+                        "height": df_back["img_height"][i],
+                        "depth": df_back["img_depth"][i],
+                    }
+                ]
+                df_back_outputI.append(pd.DataFrame([images_back]))
+                pbar.update()
+        
+        # Concatenate df_back_outputI with df_outputI into mergedI
+        # df_back_outputI = df_back_outputI.append(pd.DataFrame([images_back]), ignore_index=True)
+
         mergedI = pd.concat(df_outputI, ignore_index=True)
+        if background:
+            mergedIback = pd.concat(df_back_outputI, ignore_index=True)
+            mergedI = pd.concat([mergedI, mergedIback], ignore_index=True)
+
+        # mergedI = pd.concat(df_outputI, ignore_index=True)
         mergedA = pd.concat(df_outputA, ignore_index=True)
         mergedC = pd.concat(df_outputC, ignore_index=True)
 
@@ -908,3 +947,28 @@ class Export:
         with open(output_path, "w") as outfile:
             json.dump(obj=json_output, fp=outfile, indent=4)
         return [str(output_path)]
+
+
+    def _update_ids(self, df: pd.DataFrame, start_id: int = 0) -> pd.DataFrame:
+        """
+        Update img_id starting from a specific index and cat_id starting from 0
+        Args:
+            df: pd.DataFrame
+            start_id: int, starting index for img_id
+        """
+        # Update img_id starting from the specified start_id
+        unique_filenames = df["img_filename"].unique()
+        dict_filename_to_number = {
+            filename: idx + start_id for idx, filename in enumerate(unique_filenames)
+        }
+        df.loc[:, "img_id"] = df["img_filename"].map(dict_filename_to_number)
+
+        # Update cat_id from 0
+        unique_catnames = df["cat_name"].unique()
+        dict_catnames_to_number = {
+            catname: idx for idx, catname in enumerate(unique_catnames)
+        }
+        df.loc[:, "cat_id"] = df["cat_name"].map(dict_catnames_to_number)
+
+        df.reset_index(drop=True, inplace=True)
+        return df
