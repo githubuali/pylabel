@@ -907,7 +907,7 @@ class Export:
         # df_back_outputI = df_back_outputI.append(pd.DataFrame([images_back]), ignore_index=True)
 
         mergedI = pd.concat(df_outputI, ignore_index=True)
-        if background:
+        if background and df_back_outputI:
             mergedIback = pd.concat(df_back_outputI, ignore_index=True)
             mergedI = pd.concat([mergedI, mergedIback], ignore_index=True)
 
