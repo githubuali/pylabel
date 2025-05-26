@@ -786,7 +786,7 @@ class Export:
         pbar = tqdm(desc="Exporting to COCO file...", total=df.shape[0])
 
         if background: 
-            df_back = df[df["cat_name"].isin(background)]
+            df_back = df[df["cat_name"].str.startswith(background)]
             df = df[~df["cat_name"].isin(background)]
             list_img_filename_shared = df.merge(df_back, how="inner", on=["img_filename"])["img_filename"].unique()
             df_back = df_back[~df_back["img_filename"].isin(list_img_filename_shared)]
