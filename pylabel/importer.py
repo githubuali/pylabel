@@ -155,7 +155,7 @@ def ImportCoco(
 
     # Modify for background images
 
-    df["cat_name"] = df["cat_name"].fillna(background)
+    df["cat_name"] = df["cat_name"].replace("", background)
 
     # These should be strings
     df.cat_id = df.cat_id.astype(str)
