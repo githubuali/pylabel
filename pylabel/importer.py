@@ -1,7 +1,7 @@
-"""This module includes the commands to import an existing dataset. 
-PyLabel current supports importing labels from COCO, YOLO, and VOC formats. 
+"""This module includes the commands to import an existing dataset.
+PyLabel current supports importing labels from COCO, YOLO, and VOC formats.
 You can also import set of images that do not have labels yet and label them manually using the PyLabel
-labelling tool. """
+labelling tool."""
 
 import json
 import pandas as pd
@@ -20,6 +20,31 @@ from pylabel.dataset import Dataset
 from pylabel.exporter import Export
 
 
+def update_ids(df: pd.DataFrame, start_id: int = 0) -> pd.DataFrame:
+    """
+    Update img_id starting from a specific index and cat_id starting from 0
+    Args:
+        df: pd.DataFrame
+        start_id: int, starting index for img_id
+    """
+    # Update img_id starting from the specified start_id
+    unique_filenames = df["img_filename"].unique()
+    dict_filename_to_number = {
+        filename: idx + start_id for idx, filename in enumerate(unique_filenames)
+    }
+    df.loc[:, "img_id"] = df["img_filename"].map(dict_filename_to_number)
+
+    # Update cat_id from 0
+    unique_catnames = df["cat_name"].unique()
+    dict_catnames_to_number = {
+        catname: idx for idx, catname in enumerate(unique_catnames)
+    }
+    df.loc[:, "cat_id"] = df["cat_name"].map(dict_catnames_to_number)
+
+    df.reset_index(drop=True, inplace=True)
+    return df
+
+
 def _GetValueOrBlank(element, user_input=None):
     """
     If an element is missing from the XML file reading the .text value will return an error.
@@ -35,7 +60,9 @@ def _GetValueOrBlank(element, user_input=None):
 
 
 # These are the valid columns in the pylabel annotations table.
-def ImportCoco(path, path_to_images=None, name=None, encoding="utf-8"):
+def ImportCoco(
+    path, path_to_images=None, name=None, encoding="utf-8", background="back"
+):
     """
     This function takes the path to a JSON file in COCO format as input. It returns a PyLabel dataset object that contains the annotations.
 
@@ -94,9 +121,9 @@ def ImportCoco(path, path_to_images=None, name=None, encoding="utf-8"):
     # Converting this to string resolves issue #23
     df.ann_category_id = df.ann_category_id.astype(str)
 
-    df[
-        ["ann_bbox_xmin", "ann_bbox_ymin", "ann_bbox_width", "ann_bbox_height"]
-    ] = pd.DataFrame(df.ann_bbox.tolist(), index=df.index)
+    df[["ann_bbox_xmin", "ann_bbox_ymin", "ann_bbox_width", "ann_bbox_height"]] = (
+        pd.DataFrame(df.ann_bbox.tolist(), index=df.index)
+    )
     df.insert(8, "ann_bbox_xmax", df["ann_bbox_xmin"] + df["ann_bbox_width"])
     df.insert(10, "ann_bbox_ymax", df["ann_bbox_ymin"] + df["ann_bbox_height"])
 
@@ -126,12 +153,18 @@ def ImportCoco(path, path_to_images=None, name=None, encoding="utf-8"):
     # working with images that don't have any annotations
     df.fillna("", inplace=True)
 
+    # Modify for background images
+
+    df["cat_name"] = df["cat_name"].fillna(background)
+
     # These should be strings
     df.cat_id = df.cat_id.astype(str)
 
     # These should be integers
     df.img_width = df.img_width.astype(int)
     df.img_height = df.img_height.astype(int)
+
+    df = update_ids(df)
 
     dataset = Dataset(df)
 
