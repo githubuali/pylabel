@@ -409,7 +409,7 @@ class Export:
         file_path: str,
         sep: str = " ",
         float_format: str = "%0.4f",
-        columns: List[str] = None
+        columns: List[str] = None,
     ):
         """
         with the pandas to_csv method the output for a list (e.g. the keypoints) must include a quote character or an
@@ -426,18 +426,25 @@ class Export:
 
         with open(file_path, "w") as f:
             for row in df[columns].itertuples():
-                row=row[1:]
+                row = row[1:]
                 formatted_row = []
-                for x in row:                
+                for x in row:
                     if isinstance(x, float):
                         formatted_row.append(_format_float(x, float_format))
                     elif isinstance(x, list):
                         formatted_row.extend(
-                            [_format_float(y, float_format) if isinstance(y, float) else str(y) for y in x]
+                            [
+                                (
+                                    _format_float(y, float_format)
+                                    if isinstance(y, float)
+                                    else str(y)
+                                )
+                                for y in x
+                            ]
                         )
                     else:
                         formatted_row.append(str(x))
-                f.write(sep.join(formatted_row) + '\n')
+                f.write(sep.join(formatted_row) + "\n")
 
     def ExportToYoloV5(
         self,
@@ -501,7 +508,9 @@ class Export:
         """
         ds = self.dataset
 
-        assert not (segmentation and keypoints), "Only one of segmentation and keypoints can be exported in YOLO format"
+        assert not (
+            segmentation and keypoints
+        ), "Only one of segmentation and keypoints can be exported in YOLO format"
 
         # Inspired by https://github.com/aws-samples/groundtruth-object-detection/blob/master/create_annot.py
         yolo_dataset = ds.df.copy(deep=True)
@@ -644,7 +653,7 @@ class Export:
                     file_path=destination,
                     sep=" ",
                     float_format="%.4f",
-                    columns=columns
+                    columns=columns,
                 )
 
             # If segmentation = true then output the segmentation mask
@@ -734,12 +743,14 @@ class Export:
 
             # Save the yamlfile
             with open(path_dict["yaml_path"], "w") as file:
-                documents = yaml.dump(dict_file, file,encoding="utf-8",allow_unicode=True)
+                documents = yaml.dump(
+                    dict_file, file, encoding="utf-8", allow_unicode=True
+                )
                 output_file_paths = [path_dict["yaml_path"]] + output_file_paths
 
         return output_file_paths
 
-    def ExportToCoco(self, output_path=None, cat_id_index=None, background = None):
+    def ExportToCoco(self, output_path=None, cat_id_index=None, background=None):
         """
         Writes COCO annotation files to disk (in JSON format) and returns the path to files.
 
@@ -752,7 +763,7 @@ class Export:
                 then increment the cat_ids to index + number of categories continuously.
                 It's useful if the cat_ids are not continuous in the original dataset.
                 Some models like Yolo require starting from 0 and others like Detectron require starting from 1.
-            background (list): 
+            background (list):
                 List of categories used as background for no detections
 
         Returns:
@@ -785,18 +796,18 @@ class Export:
 
         pbar = tqdm(desc="Exporting to COCO file...", total=df.shape[0])
 
-        if background: 
+        if background:
             df_back = df[df["cat_name"].str.startswith(background)]
             df = df[~df["cat_name"].str.startswith(background)]
-            list_img_filename_shared = df.merge(df_back, how="inner", on=["img_filename"])["img_filename"].unique()
+            list_img_filename_shared = df.merge(
+                df_back, how="inner", on=["img_filename"]
+            )["img_filename"].unique()
             df_back = df_back[~df_back["img_filename"].isin(list_img_filename_shared)]
-
 
             df = self._update_ids(df)
 
             start_image_id = max(df["img_id"]) + 1
             df_back = self._update_ids(df_back, start_image_id)
-        
 
         for i in range(0, df.shape[0]):
             images = [
@@ -835,14 +846,22 @@ class Export:
                 ]
 
                 # include keypoints, if available
-                if "ann_keypoints" in df.keys() and (not np.isnan(df["ann_keypoints"][i]).all()):
+                if "ann_keypoints" in df.keys() and (
+                    not np.isnan(df["ann_keypoints"][i]).all()
+                ):
                     keypoints = df["ann_keypoints"][i]
                     if isinstance(keypoints, list):
-                        n_keypoints = int(len(keypoints) / 3)  # 3 numbers per keypoint: x,y,visibility
+                        n_keypoints = int(
+                            len(keypoints) / 3
+                        )  # 3 numbers per keypoint: x,y,visibility
                     elif isinstance(keypoints, np.ndarray):
-                        n_keypoints = int(keypoints.size / 3)  # 3 numbers per keypoint: x,y,visibility
+                        n_keypoints = int(
+                            keypoints.size / 3
+                        )  # 3 numbers per keypoint: x,y,visibility
                     else:
-                        raise TypeError('The keypoints array is expected to be either a list or a numpy array')
+                        raise TypeError(
+                            "The keypoints array is expected to be either a list or a numpy array"
+                        )
                     annotations[0]["num_keypoints"] = n_keypoints
                     annotations[0]["keypoints"] = keypoints
                 else:
@@ -887,8 +906,8 @@ class Export:
 
             pbar.update()
 
-        if background: 
-            for i in range(0, df_back.shape[0]): 
+        if background:
+            for i in range(0, df_back.shape[0]):
                 images_back = [
                     {
                         "id": df_back["img_id"][i],
@@ -902,7 +921,7 @@ class Export:
                 ]
                 df_back_outputI.append(pd.DataFrame([images_back]))
                 pbar.update()
-        
+
         # Concatenate df_back_outputI with df_outputI into mergedI
         # df_back_outputI = df_back_outputI.append(pd.DataFrame([images_back]), ignore_index=True)
 
@@ -950,7 +969,6 @@ class Export:
             json.dump(obj=json_output, fp=outfile, indent=4)
         return [str(output_path)]
 
-
     def _update_ids(self, df: pd.DataFrame, start_id: int = 0) -> pd.DataFrame:
         """
         Update img_id starting from a specific index and cat_id starting from 0
@@ -966,7 +984,7 @@ class Export:
         df.loc[:, "img_id"] = df["img_filename"].map(dict_filename_to_number)
 
         # Update cat_id from 0
-        unique_catnames = df["cat_name"].unique()
+        unique_catnames = sorted(df["cat_name"].unique())
         dict_catnames_to_number = {
             catname: idx for idx, catname in enumerate(unique_catnames)
         }
